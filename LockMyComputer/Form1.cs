@@ -40,7 +40,47 @@ namespace LockMyComputer
         [DllImport("user32.dll")]
         public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
+        [DllImport("wtsapi32.dll")]
+        private static extern bool WTSRegisterSessionNotification(IntPtr hWnd, int dwFlags);
+
+        [DllImport("wtsapi32.dll")]
+        private static extern bool WTSUnRegisterSessionNotification(IntPtr hWnd);
+
         private const byte VK_F13 = 0x7C;
         private const uint KEYEVENTF_KEYUP = 0x0002;
+
+        private const int NOTIFY_FOR_THIS_SESSION = 0;
+        private const int WM_WTSSESSION_CHANGE = 0x02B1;
+        private const int WTS_SESSION_LOCK = 0x7;
+        private const int WTS_SESSION_UNLOCK = 0x8;
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            WTSRegisterSessionNotification(Handle, NOTIFY_FOR_THIS_SESSION);
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            WTSUnRegisterSessionNotification(Handle);
+            base.OnHandleDestroyed(e);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_WTSSESSION_CHANGE)
+            {
+                switch ((int)m.WParam)
+                {
+                    case WTS_SESSION_LOCK:
+                        timer_nolock.Enabled = false;
+                        break;
+                    case WTS_SESSION_UNLOCK:
+                        timer_nolock.Enabled = true;
+                        break;
+                }
+            }
+            base.WndProc(ref m);
+        }
     }
 }
