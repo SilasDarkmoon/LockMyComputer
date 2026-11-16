@@ -30,6 +30,20 @@ namespace LockMyComputer
 
         private void timer_nolock_Tick(object sender, EventArgs e)
         {
+            // Skip the synthetic key while the user is actively providing real input
+            // (keyboard, mouse move/click, touch, pen). It is only needed once the
+            // session has been idle for the full timer interval.
+            LASTINPUTINFO lii = default;
+            lii.cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>();
+            if (GetLastInputInfo(ref lii))
+            {
+                uint idleMilliseconds = GetTickCount() - lii.dwTime;
+                if (idleMilliseconds < (uint)timer_nolock.Interval)
+                {
+                    return;
+                }
+            }
+
             keybd_event(VK_F13, 0, 0, UIntPtr.Zero);
             keybd_event(VK_F13, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
@@ -39,6 +53,19 @@ namespace LockMyComputer
 
         [DllImport("user32.dll")]
         public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetTickCount();
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LASTINPUTINFO
+        {
+            public uint cbSize;
+            public uint dwTime;
+        }
 
         [DllImport("wtsapi32.dll")]
         private static extern bool WTSRegisterSessionNotification(IntPtr hWnd, int dwFlags);
